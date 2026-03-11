@@ -123,6 +123,39 @@ var (
 			"host",
 		},
 	)
+	goldpingerDnsResponseTimeHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "goldpinger_dns_response_time_s",
+			Help:    "Histogram of response times for DNS probes",
+			Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30},
+		},
+		[]string{
+			"goldpinger_instance",
+			"host",
+		},
+	)
+	goldpingerTcpResponseTimeHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "goldpinger_tcp_response_time_s",
+			Help:    "Histogram of response times for TCP probes",
+			Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30},
+		},
+		[]string{
+			"goldpinger_instance",
+			"host",
+		},
+	)
+	goldpingerHttpResponseTimeHistogram = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "goldpinger_http_response_time_s",
+			Help:    "Histogram of response times for HTTP probes",
+			Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30},
+		},
+		[]string{
+			"goldpinger_instance",
+			"host",
+		},
+	)
 	bootTime = time.Now()
 )
 
@@ -136,6 +169,9 @@ func init() {
 	prometheus.MustRegister(goldpingerDnsErrorsCounter)
 	prometheus.MustRegister(goldPingerHttpErrorsCounter)
 	prometheus.MustRegister(goldPingerTcpErrorsCounter)
+	prometheus.MustRegister(goldpingerDnsResponseTimeHistogram)
+	prometheus.MustRegister(goldpingerTcpResponseTimeHistogram)
+	prometheus.MustRegister(goldpingerHttpResponseTimeHistogram)
 	zap.L().Info("Metrics setup - see /metrics")
 }
 
@@ -208,6 +244,27 @@ func CountHttpError(host string) {
 		GoldpingerConfig.Hostname,
 		host,
 	).Inc()
+}
+
+func ObserveDnsResponseTime(host string, seconds float64) {
+	goldpingerDnsResponseTimeHistogram.WithLabelValues(
+		GoldpingerConfig.Hostname,
+		host,
+	).Observe(seconds)
+}
+
+func ObserveTcpResponseTime(host string, seconds float64) {
+	goldpingerTcpResponseTimeHistogram.WithLabelValues(
+		GoldpingerConfig.Hostname,
+		host,
+	).Observe(seconds)
+}
+
+func ObserveHttpResponseTime(host string, seconds float64) {
+	goldpingerHttpResponseTimeHistogram.WithLabelValues(
+		GoldpingerConfig.Hostname,
+		host,
+	).Observe(seconds)
 }
 
 // returns a timer for easy observing of the durations of calls to kubernetes API

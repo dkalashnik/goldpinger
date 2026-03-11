@@ -127,32 +127,36 @@ func pickPodHostIP(podIP, hostIP string) string {
 func checkTargets() models.ProbeResults {
 	results := make(map[string][]models.ProbeResult)
 	probes := []struct {
-		protocol string
-		hosts    []string
-		probeFn  func(addr string, timeout time.Duration) error
-		statFn   func(host string)
-		timeout  time.Duration
+		protocol  string
+		hosts     []string
+		probeFn   func(addr string, timeout time.Duration) error
+		statFn    func(host string)
+		observeFn func(host string, seconds float64)
+		timeout   time.Duration
 	}{
 		{
-			protocol: "dns",
-			hosts:    GoldpingerConfig.DnsHosts,
-			probeFn:  doDNSProbe,
-			statFn:   CountDnsError,
-			timeout:  GoldpingerConfig.DnsCheckTimeout,
+			protocol:  "dns",
+			hosts:     GoldpingerConfig.DnsHosts,
+			probeFn:   doDNSProbe,
+			statFn:    CountDnsError,
+			observeFn: ObserveDnsResponseTime,
+			timeout:   GoldpingerConfig.DnsCheckTimeout,
 		},
 		{
-			protocol: "http",
-			hosts:    GoldpingerConfig.HTTPTargets,
-			probeFn:  doHTTPProbe,
-			statFn:   CountHttpError,
-			timeout:  GoldpingerConfig.HTTPCheckTimeout,
+			protocol:  "http",
+			hosts:     GoldpingerConfig.HTTPTargets,
+			probeFn:   doHTTPProbe,
+			statFn:    CountHttpError,
+			observeFn: ObserveHttpResponseTime,
+			timeout:   GoldpingerConfig.HTTPCheckTimeout,
 		},
 		{
-			protocol: "tcp",
-			hosts:    GoldpingerConfig.TCPTargets,
-			probeFn:  doTCPProbe,
-			statFn:   CountTcpError,
-			timeout:  GoldpingerConfig.TCPCheckTimeout,
+			protocol:  "tcp",
+			hosts:     GoldpingerConfig.TCPTargets,
+			probeFn:   doTCPProbe,
+			statFn:    CountTcpError,
+			observeFn: ObserveTcpResponseTime,
+			timeout:   GoldpingerConfig.TCPCheckTimeout,
 		},
 	}
 
@@ -165,12 +169,14 @@ func checkTargets() models.ProbeResults {
 			res := models.ProbeResult{Protocol: probe.protocol}
 			start := time.Now()
 			err := probe.probeFn(host, probe.timeout)
+			elapsed := time.Since(start)
 			if err != nil {
 				res.Error = err.Error()
 				probe.statFn(host)
 			}
 
-			res.ResponseTimeMs = time.Since(start).Milliseconds()
+			res.ResponseTimeMs = elapsed.Milliseconds()
+			probe.observeFn(host, elapsed.Seconds())
 			results[host] = append(results[host], res)
 		}
 	}
@@ -234,6 +240,7 @@ func CheckAllPods(checkAllCtx context.Context, pods map[string]*GoldpingerPod) *
 
 				params := operations.NewCheckServicePodsParamsWithContext(checkCtx)
 				resp, err := client.Operations.CheckServicePods(params)
+				timer.ObserveDuration()
 				OK = (err == nil)
 				if OK {
 					logger.Debug("Check Ok")
@@ -243,7 +250,6 @@ func CheckAllPods(checkAllCtx context.Context, pods map[string]*GoldpingerPod) *
 						HostIP:   channelResult.hostIPv4,
 						Response: resp.Payload,
 					}
-					timer.ObserveDuration()
 				} else {
 					logger.Warn("Check returned error", zap.Error(err))
 					channelResult.checkAllPodResult = models.CheckAllPodResult{
