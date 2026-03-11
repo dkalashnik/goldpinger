@@ -55,6 +55,7 @@ func NewPinger(pod *GoldpingerPod, resultsChan chan<- PingAllPodsResult) *Pinger
 			"ping",
 			pod.HostIP,
 			pod.PodIP,
+			pod.Name,
 		),
 
 		logger: zap.L().With(

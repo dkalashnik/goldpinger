@@ -212,7 +212,7 @@ func CheckAllPods(checkAllCtx context.Context, pods map[string]*GoldpingerPod) *
 
 			// stats
 			CountCall("made", "check")
-			timer := GetLabeledPeersCallsTimer("check", pod.HostIP, pod.PodIP)
+			timer := GetLabeledPeersCallsTimer("check", pod.HostIP, pod.PodIP, pod.Name)
 
 			// setup
 			var channelResult CheckServicePodsResult
